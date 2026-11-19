@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Cover Studio</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <div>
+      <h1>Neon Cover Studio</h1>
+      <p>Multi-panel poster covers with a neon-sunset grade</p>
+    </div>
+  </div>
+  <p class="topbar-note">Works fully offline · your photos never leave this device</p>
+</header>
+
+<main class="workspace">
+  <section class="stage-wrap">
+    <div id="stage" class="stage">
+      <canvas id="previewCanvas" width="1080" height="1350" aria-label="Live cover preview"></canvas>
+      <p class="stage-hint">Drop photos anywhere on the cover · click a panel to select it · drag inside a panel to reframe its photo</p>
+    </div>
+  </section>
+
+  <aside class="controls">
+    <section class="card">
+      <h2>1 · Photos</h2>
+      <label class="upload-button">
+        Add your photos
+        <input id="photoInput" type="file" accept="image/*" multiple>
+      </label>
+      <div class="sample-row">
+        <button id="sampleBoulevard" type="button">Use boulevard sample</button>
+        <button id="samplePier" type="button">Use pier sample</button>
+      </div>
+      <div id="photoStrip" class="photo-strip" aria-label="Loaded photos"></div>
+      <p class="fine">One photo can fill several panels, or give every panel its own.</p>
+    </section>
+
+    <section class="card">
+      <h2>2 · Layout</h2>
+      <div id="layoutRow" class="layout-row"></div>
+    </section>
+
+    <section class="card">
+      <h2>3 · Panels</h2>
+      <div id="panelList" class="panel-list"></div>
+      <p class="fine">Selected panel: <strong id="selectedPanelName"></strong></p>
+      <label class="slider">
+        <span>Zoom</span>
+        <input id="zoomRange" type="range" min="40" max="300" value="100">
+      </label>
+      <label class="slider">
+        <span>Shift left / right</span>
+        <input id="offsetXRange" type="range" min="-60" max="60" value="0">
+      </label>
+      <label class="slider">
+        <span>Shift up / down</span>
+        <input id="offsetYRange" type="range" min="-60" max="60" value="0">
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>4 · Look &amp; caption</h2>
+      <label class="slider">
+        <span>Neon-sunset grade</span>
+        <input id="gradeRange" type="range" min="0" max="100" value="80">
+      </label>
+      <label class="field">
+        <span>Title</span>
+        <input id="titleInput" type="text" maxlength="26" value="NEON NIGHTS">
+      </label>
+      <label class="field">
+        <span>Subtitle</span>
+        <input id="subtitleInput" type="text" maxlength="42" value="welcome back to the coast">
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>5 · Export</h2>
+      <div id="sizeRow" class="size-row"></div>
+      <button id="exportButton" type="button" class="export-button">Export PNG</button>
+      <p id="statusLine" class="status" role="status"></p>
+    </section>
+  </aside>
+</main>
+
+<script type="module" src="./src/editor.js"></script>
+</body>
+</html>
