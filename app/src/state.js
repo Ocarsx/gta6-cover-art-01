@@ -7,7 +7,7 @@
 export const CAST = [
   { id: 'pier', file: 'samples/pier.jpg', label: 'THE CAPTAIN', fx: 0.38, fy: 0.22, fh: 0.13 },
   { id: 'boulevard', file: 'samples/boulevard.jpg', label: 'THE DRIVER', fx: 0.52, fy: 0.22, fh: 0.13 },
-  { id: 'young', file: 'samples/cast-young.jpg', label: 'THE RIDER', fx: 0.47, fy: 0.33, fh: 0.22 },
+  { id: 'young', file: 'samples/cast-young.jpg', label: 'THE RIDER', fx: 0.47, fy: 0.36, fh: 0.27 },
   { id: 'curly', file: 'samples/cast-curly.jpg', label: 'THE LOOKOUT', fx: 0.47, fy: 0.34, fh: 0.16 },
   { id: 'red', file: 'samples/cast-red.jpg', label: 'THE FIXER', fx: 0.47, fy: 0.37, fh: 0.15 },
   { id: 'silver', file: 'samples/cast-silver.jpg', label: 'THE BOSS', fx: 0.50, fy: 0.35, fh: 0.17 },
