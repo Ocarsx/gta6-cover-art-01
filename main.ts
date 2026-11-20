@@ -1,32 +1,39 @@
-// Neon Cover Studio — entry program for the gta6-cover-art-01 bounty.
-// It hands the built app in: copies app/ and screenshots/ from this
-// repository into the output directory and writes dossier.json there,
-// using the kit's buildDossier from vendor/makefun-app.ts. Standard
-// library only, no network, deterministic output.
+// Entry point for the GTA 6 Cover Art Studio III submission (Node 22, no
+// dependencies beyond the kit's vendored helper). The app itself is plain
+// static files under app/ — an offline editor that draws its cover on a
+// canvas and exports PNGs — so handing it in is just copying those files
+// plus the screenshots into the grader's output folder and writing the
+// dossier the judge reads, built by the vendored make.fun library.
+//
+// Try it locally with `node serve.ts`, then open http://localhost:8080.
+// Outside the grader, MAKEFUN_OUTPUT_DIR stands in for /output:
+//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-app.ts';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)));
-const outDir = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
+const here = fileURLToPath(new URL('.', import.meta.url));
+const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-const dossierCaps = {
-  text_max_bytes: 163840,
-  screenshots: { max: 4, max_bytes: 262144 },
-  app_max_files: 993,
-  app_max_bytes: 50331648,
-};
-
-function handIn() {
-  mkdirSync(outDir, { recursive: true });
-  for (const folder of ['app', 'screenshots']) {
-    cpSync(join(repoRoot, folder), join(outDir, folder), { recursive: true });
-  }
-  const dossier = buildDossier(outDir, dossierCaps);
-  writeFileSync(join(outDir, 'dossier.json'), dossier);
-  console.log(`Neon Cover Studio handed in to ${outDir}`);
+mkdirSync(out, { recursive: true });
+cpSync(join(here, 'app'), join(out, 'app'), { recursive: true });
+mkdirSync(join(out, 'screenshots'), { recursive: true });
+if (existsSync(join(here, 'screenshots'))) {
+  cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 }
 
-handIn();
+// The caps the scorer enforces: the text budget shapes the dossier, the
+// rest refuse an entry the scorer would refuse anyway (too many or too big
+// screenshots, too many app files, or a path that is too long).
+writeFileSync(
+  join(out, 'dossier.json'),
+  buildDossier(out, {
+    text_max_bytes: 163840,
+    screenshots: { max: 4, max_bytes: 262144 },
+    app_max_files: 993,
+    app_max_bytes: 50331648,
+    app_path_max_bytes: 1000,
+  }),
+);
