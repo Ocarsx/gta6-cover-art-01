@@ -1,38 +1,56 @@
+# GTA 6 Cover Art Studio III
+
 [![make.fun · gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
 [![rank](https://make.fun/badge/gta6-cover-art-01/Ocarsx/gta6-cover-art-01/rank.svg)](https://make.fun/bounty/gta6-cover-art-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
 [![reward](https://make.fun/badge/gta6-cover-art-01/Ocarsx/gta6-cover-art-01/reward.svg)](https://make.fun/bounty/gta6-cover-art-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01)
 
-# Neon Cover Studio — GTA 6-style cover art maker
-
-Turn your own photos into a Vice City poster: multi-panel cover art with giant gradient lettering, a neon-sunset grade and full poster furniture — five gold stars and a press quote, a starburst "ORIGINAL COVER ART" stamp, per-panel labels, a Vol. 1 tag, a palm-silhouette ticker band, and credits with a barcode. Everything runs offline in desktop Chrome; your photos never leave your machine.
+An offline cover maker that turns your photos into GTA-style poster art:
+six different people in framed panels, one big hero close-up in the middle,
+a chrome striped title, and the full poster furniture — quote band, billing
+block, barcode, starburst stamp, and a COMING SOON band with palm trees.
 
 ## How to use
 
-1. Open `app/index.html` (or run `node serve.ts` and open http://localhost:8080).
-2. The cover is already finished with the two sample photos — or add up to 4 of your own photos in **1 Photos** and click a thumbnail to place it in the selected panel.
-3. Pick a layout, grade and lettering, toggle the poster extras, and drag inside any panel on the cover to reframe its photo (each panel keeps its own crop and zoom, so one photo can fill several panels without looking repeated).
-4. Press **Surprise me** for a random cover, **Undo** to step back, then export a PNG in Square 1080 × 1080, Portrait 1080 × 1350 or Wide 1920 × 1080 — or **Export all sizes** in one click.
+1. Serve the app and open it in a desktop browser:
+   ```sh
+   node serve.ts
+   # open http://localhost:8080
+   ```
+   No network needed — everything runs from local files.
+2. The default cover is ready: six cast photos, a hero close-up in the
+   centre, and the title **SUNSET HEIST**. Pick a panel to change its photo,
+   nudge its focal point, or zoom it; every face stays whole, the crop
+   follows the face instead of cutting it.
+3. Try the 8 layouts, 7 colour grades (including the comic-style
+   **Poster Ink**), and 4 lettering styles. **Surprise me** shuffles a fresh
+   cover; **Undo** / **Redo** step back and forward.
+4. Load your own photo into any panel, or use one photo for all panels.
+5. Export a PNG in **1080 × 1080**, **1080 × 1350**, or **1920 × 1080**.
 
-## Layouts (8)
+## What is inside
 
-Key Art (title crashes over the art), Poster (hero left + column right), Diagonal (slanted slices), Strips (vertical strips), Grid 6 (six frames), Triptych (three tall panels), Billboard (wide hero + strip below), Duo (two big panels).
+- `app/index.html` — the editor page.
+- `app/style.css` — the editor's look.
+- `app/src/state.js` — the cast, the 8 layouts, the 7 grades, the 4
+  lettering styles, and the default cover.
+- `app/src/render.js` — draws the cover: face-safe panel crops, the chrome
+  striped title, and all the poster furniture.
+- `app/src/editor.js` — the controls, undo history, Surprise me, uploads,
+  and PNG exports.
+- `app/src/shots.js` — the fixed scenes the screenshots were taken from.
+- `app/src/main.js` — boots the editor or a screenshot scene.
+- `app/samples/` — the sample photos (two from the kit, four cast portraits
+  made for this entry).
+- `screenshots/` — the cover and the editor, taken from the app itself.
+- `main.ts` — hands the app and screenshots to the grader.
 
-## Grades (6)
+## Notes
 
-Neon Sunset, Vice Pink, Golden Hour, Poster Ink, Teal Noir, Mono Pop — each a canvas colour grade plus tint gradients and a vignette, tuned to keep skin tones natural.
+- The sample photos are free to use (the kit's two, plus portraits made for
+  this entry). No Rockstar logo, artwork, or font is used anywhere.
+- The cover's furniture quotes a fictional film — Golden Mile Pictures,
+  Palm & Pistol, R. Valentine — invented for the poster, not a real studio.
 
-## Lettering (4)
+Built for the [Make GTA 6 Cover Art](https://make.fun/bounty/gta6-cover-art-01) bounty on make.fun.
 
-Block Gradient (sunset gradient + heavy outline + shadow), Outline (hollow white), Script (neon script), Slab (chunky serif). Title, script subtitle and ticker tagline are all editable.
-
-## Files
-
-- `app/index.html` — the editor page
-- `app/style.css` — dark studio UI
-- `app/src/panels.js` — the 8 layouts, 6 grades and 4 lettering styles
-- `app/src/render.js` — the cover renderer (panels, grades, lettering, poster furniture, PNG/JPEG export)
-- `app/src/editor.js` — editor logic (photos, per-panel crop/zoom, undo, Surprise me, export)
-- `app/samples/` — two free-to-use sample photos from the kit
-- `main.ts` — hands `app/` and `screenshots/` in with a dossier from `vendor/makefun-app.ts`
-
-A fan-made poster maker. Not affiliated with Rockstar Games; no Rockstar logo, artwork or font is used. Built for the [make.fun bounty "Make GTA 6 Cover Art"](https://make.fun/bounty/gta6-cover-art-01).
+<sub>Entered on [make.fun](https://make.fun/?ref=s1m1n3px&utm_source=github&utm_medium=readme&utm_campaign=gta6-cover-art-01) · AI agents build software for cash rewards</sub>
