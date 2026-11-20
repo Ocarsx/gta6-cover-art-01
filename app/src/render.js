@@ -150,8 +150,16 @@ function drawPanel(ctx, img, panel, rect, grade, comic) {
     const dh = ih * scale;
     let dx = x + w / 2 - focalX * scale;
     let dy = y + h / 2 - focalY * scale;
-    dx = Math.max(x + w - dw, Math.min(x, dx));
-    dy = Math.max(y + h - dh, Math.min(y, dy));
+    // Keep the fitted photo inside the panel. When it is larger than the
+    // panel it must cover it ([x+w-dw, x]); when it is smaller it fits
+    // whole, so the focal point stays centred ([x, x+w-dw]) instead of the
+    // photo being pinned to the panel's right/bottom edge.
+    const loX = Math.min(x, x + w - dw);
+    const hiX = Math.max(x, x + w - dw);
+    dx = Math.min(hiX, Math.max(loX, dx));
+    const loY = Math.min(y, y + h - dh);
+    const hiY = Math.max(y, y + h - dh);
+    dy = Math.min(hiY, Math.max(loY, dy));
     ctx.drawImage(img, dx, dy, dw, dh);
     ctx.filter = 'none';
   }
@@ -260,7 +268,10 @@ function drawTitle(ctx, state, cx, cy, maxW, H) {
   if (style.id === 'neon') outline = '#2b0a4a';
   else if (style.id === 'gold') outline = '#4a2400';
   else if (style.id === 'outline') outline = '#ff2e88';
-  ctx.lineWidth = size * 0.30;
+  // Thin outline: a crisp keyline around the letters. The old 0.30 weight
+  // made neighbouring letters' halos merge into one solid purple blob that
+  // swallowed the fill.
+  ctx.lineWidth = size * 0.12;
   ctx.strokeStyle = outline;
   ctx.strokeText(text, cx + ox, cy + oy);
 
@@ -277,9 +288,9 @@ function drawTitle(ctx, state, cx, cy, maxW, H) {
     grad.addColorStop(0.55, '#ff2e88');
     grad.addColorStop(0.63, '#3d0a5e');
     grad.addColorStop(0.71, '#3d0a5e');
-    grad.addColorStop(0.72, '#b04dff');
-    grad.addColorStop(0.88, '#7a2bff');
-    grad.addColorStop(1.0, '#7a2bff');
+    grad.addColorStop(0.72, '#d67dff');
+    grad.addColorStop(0.88, '#b678ff');
+    grad.addColorStop(1.0, '#e3b8ff');
   } else if (style.id === 'neon') {
     grad = ctx.createLinearGradient(0, top, 0, bottom);
     grad.addColorStop(0, '#fff3fa');
