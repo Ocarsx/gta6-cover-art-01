@@ -1,303 +1,317 @@
-// Wires the editor: every control on the page, the undo history, the
-// Surprise me button, photo uploads, and the PNG exports.
-import { CAST, GRADES, LAYOUTS, LETTERINGS, cloneState, defaultState } from './state.js';
-import { drawCover, exportCover } from './render.js';
+// Cover Art Studio III — the editor: every control in the side panel, the
+// undo/redo history, Surprise me, photo uploads and the PNG exports. It owns
+// no pixels; it only changes the state and asks main.js to repaint.
 
-const SIZES = [
-  { label: '1080 \u00D7 1080', w: 1080, h: 1080 },
-  { label: '1080 \u00D7 1350', w: 1080, h: 1350 },
-  { label: '1920 \u00D7 1080', w: 1920, h: 1080 },
-];
+import {
+  GRADES, LAYOUTS, LETTERINGS, QUOTES, SAMPLES, ROLES,
+  SUBTITLE_IDEAS, TAGLINE_IDEAS, TITLE_IDEAS, cloneState, defaultState,
+} from './state.js';
+import { exportCover } from './render.js';
 
-const SURPRISE_TITLES = [
-  ['PALM FEVER', 'One Last Summer', 'FIVE FRIENDS \u00B7 ONE COAST \u00B7 NO WAY BACK'],
-  ['NEON TIDE', 'Chase the Last Light', 'EVERY SUNSET HAS A PRICE'],
-  ['VELVET GETAWAY', 'Drive Fast, Shine Bright', 'THE CREW IS ALL THAT MATTERS'],
-  ['MIDNIGHT COAST', 'Where the Palms Lean In', 'NO MAPS \u00B7 NO MERCY \u00B7 NO BRAKES'],
-  ['GOLDEN GETAWAY', 'Steal the Sunset', 'EVERYONE WANTS A CUT OF THE SUNSET'],
-];
-
-function el(tag, cls, text) {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
+function el(tag, attrs = {}, text = '') {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v;
+    else if (k === 'html') node.innerHTML = v;
+    else node.setAttribute(k, v);
+  }
+  if (text) node.textContent = text;
+  return node;
 }
 
-function downloadBlob(blob, name) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+function option(value, label) {
+  const o = document.createElement('option');
+  o.value = value;
+  o.textContent = label;
+  return o;
 }
 
-export function initEditor(canvas, loadImage) {
-  const state = defaultState();
-  // photos[i] is the Image drawn in panel i; uploads replace one slot.
-  const photos = new Array(6).fill(null);
-  let history = [cloneState(state)];
-  let histAt = 0;
-  let selectedPanel = 3; // the hero, so its controls show first
-  const status = document.getElementById('status');
+function field(labelText, input) {
+  const wrap = el('label', { class: 'field' });
+  wrap.append(el('span', { class: 'field-label' }, labelText), input);
+  return wrap;
+}
 
-  function say(msg) {
-    if (status) status.textContent = msg;
-  }
+export function initEditor(root, api) {
+  const { getState, setState, images, renderPreview, status } = api;
+  let history = [];
+  let future = [];
 
-  function redraw() {
-    drawCover(canvas, state, photos);
-  }
-
-  function commit(label) {
-    history = history.slice(0, histAt + 1);
-    history.push(cloneState(state));
-    histAt = history.length - 1;
-    if (history.length > 60) {
-      history.shift();
-      histAt -= 1;
-    }
-    syncUndoButtons();
-    if (label) say(label);
-  }
-
-  function applySnapshot(snap) {
-    const keepPhotos = photos.slice();
-    Object.keys(state).forEach((k) => delete state[k]);
-    Object.assign(state, cloneState(snap));
-    photos.splice(0, photos.length, ...keepPhotos);
-    buildPanelList();
-    syncControls();
-    redraw();
+  function commit(next, label) {
+    history.push(cloneState(getState()));
+    if (history.length > 60) history.shift();
+    future = [];
+    setState(next);
+    renderPreview();
+    refreshButtons();
+    if (label) status(label);
   }
 
   function undo() {
-    if (histAt <= 0) return;
-    histAt -= 1;
-    applySnapshot(history[histAt]);
-    syncUndoButtons();
-    say('Undid that step.');
+    if (history.length === 0) return;
+    future.push(cloneState(getState()));
+    setState(history.pop());
+    renderPreview();
+    refreshButtons();
+    status('Undid the last change.');
   }
 
   function redo() {
-    if (histAt >= history.length - 1) return;
-    histAt += 1;
-    applySnapshot(history[histAt]);
-    syncUndoButtons();
-    say('Redid that step.');
+    if (future.length === 0) return;
+    history.push(cloneState(getState()));
+    setState(future.pop());
+    renderPreview();
+    refreshButtons();
+    status('Redid the change.');
   }
 
-  function syncUndoButtons() {
-    const u = document.getElementById('undo');
-    const r = document.getElementById('redo');
-    if (u) u.disabled = histAt <= 0;
-    if (r) r.disabled = histAt >= history.length - 1;
-  }
-
-  // ---- option rows (layout / grade / lettering) ----
-  function optionRow(hostId, items, current, onPick) {
-    const host = document.getElementById(hostId);
-    host.innerHTML = '';
-    items.forEach((item) => {
-      const b = el('button', 'chip' + (item.id === current ? ' on' : ''), item.name);
-      b.type = 'button';
-      b.addEventListener('click', () => {
-        onPick(item.id);
-        host.querySelectorAll('.chip').forEach((c) => c.classList.remove('on'));
-        b.classList.add('on');
-      });
-      host.appendChild(b);
-    });
-  }
-
-  function syncControls() {
-    optionRow('layouts', LAYOUTS, state.layout, (id) => { state.layout = id; commit('Layout changed.'); redraw(); });
-    optionRow('grades', GRADES, state.grade, (id) => { state.grade = id; commit('Grade changed.'); redraw(); });
-    optionRow('letterings', LETTERINGS, state.lettering, (id) => { state.lettering = id; commit('Lettering changed.'); redraw(); });
-    const t = document.getElementById('title');
-    if (t && t.value !== state.title) t.value = state.title;
-    const s = document.getElementById('subtitle');
-    if (s && s.value !== state.subtitle) s.value = state.subtitle;
-    const g = document.getElementById('tagline');
-    if (g && g.value !== state.tagline) g.value = state.tagline;
-  }
-
-  // ---- per-panel cards ----
-  function buildPanelList() {
-    const host = document.getElementById('panels');
-    host.innerHTML = '';
-    state.panels.forEach((panel, i) => {
-      const card = el('div', 'panel-card' + (i === selectedPanel ? ' sel' : ''));
-      card.addEventListener('click', () => {
-        selectedPanel = i;
-        buildPanelList();
-      });
-      const head = el('div', 'panel-head');
-      head.appendChild(el('strong', '', `Panel ${i + 1}`));
-      const member = CAST[panel.cast];
-      head.appendChild(el('span', 'muted', member ? member.label : ''));
-      card.appendChild(head);
-
-      const photoRow = el('label', 'field', 'Photo');
-      const sel = el('select');
-      CAST.forEach((m, ci) => {
-        const o = el('option', '', m.label);
-        o.value = String(ci);
-        if (ci === panel.cast) o.selected = true;
-        sel.appendChild(o);
-      });
-      sel.addEventListener('change', async () => {
-        panel.cast = Number(sel.value);
-        panel.fx = CAST[panel.cast].fx;
-        panel.fy = CAST[panel.cast].fy;
-        panel.label = CAST[panel.cast].label;
-        photos[i] = await loadImage(CAST[panel.cast].file);
-        buildPanelList();
-        commit('Photo swapped.');
-        redraw();
-      });
-      sel.addEventListener('click', (e) => e.stopPropagation());
-      photoRow.appendChild(sel);
-      card.appendChild(photoRow);
-
-      const upRow = el('div', 'field');
-      upRow.appendChild(el('span', '', 'Your photo'));
-      const up = el('input');
-      up.type = 'file';
-      up.accept = 'image/*';
-      up.addEventListener('change', async () => {
-        const file = up.files[0];
-        if (!file) return;
-        photos[i] = await loadImage(URL.createObjectURL(file));
-        panel.fx = 0.5;
-        panel.fy = 0.4;
-        commit('Your photo is in panel ' + (i + 1) + '.');
-        redraw();
-      });
-      up.addEventListener('click', (e) => e.stopPropagation());
-      upRow.appendChild(up);
-      card.appendChild(upRow);
-
-      const sliders = [
-        ['Focal X', 'fx', 0.05, 0.95, 0.01],
-        ['Focal Y', 'fy', 0.05, 0.95, 0.01],
-        ['Zoom', 'zoom', 0.8, 2.0, 0.05],
-      ];
-      sliders.forEach(([label, key, min, max, step]) => {
-        const row = el('label', 'field', `${label} `);
-        const inp = el('input');
-        inp.type = 'range';
-        inp.min = min;
-        inp.max = max;
-        inp.step = step;
-        inp.value = panel[key];
-        inp.addEventListener('input', () => {
-          panel[key] = Number(inp.value);
-          redraw();
-        });
-        inp.addEventListener('change', () => commit('Crop adjusted.'));
-        inp.addEventListener('click', (e) => e.stopPropagation());
-        row.appendChild(inp);
-        card.appendChild(row);
-      });
-
-      const labelRow = el('label', 'field', 'Name tag');
-      const lin = el('input');
-      lin.type = 'text';
-      lin.value = panel.label;
-      lin.maxLength = 24;
-      lin.addEventListener('input', () => { panel.label = lin.value.toUpperCase(); redraw(); });
-      lin.addEventListener('change', () => commit('Name tag edited.'));
-      lin.addEventListener('click', (e) => e.stopPropagation());
-      labelRow.appendChild(lin);
-      card.appendChild(labelRow);
-      host.appendChild(card);
-    });
-  }
-
-  // ---- text fields ----
-  const titleInput = document.getElementById('title');
-  titleInput.addEventListener('input', () => { state.title = titleInput.value; redraw(); });
-  titleInput.addEventListener('change', () => commit('Title edited.'));
-  const subInput = document.getElementById('subtitle');
-  subInput.addEventListener('input', () => { state.subtitle = subInput.value; redraw(); });
-  subInput.addEventListener('change', () => commit('Subtitle edited.'));
-  const tagInput = document.getElementById('tagline');
-  tagInput.addEventListener('input', () => { state.tagline = tagInput.value; redraw(); });
-  tagInput.addEventListener('change', () => commit('Tagline edited.'));
-
-  // ---- buttons ----
-  document.getElementById('undo').addEventListener('click', undo);
-  document.getElementById('redo').addEventListener('click', redo);
-  document.getElementById('surprise').addEventListener('click', () => {
+  function surprise() {
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-    state.layout = pick(LAYOUTS).id;
-    state.grade = pick(GRADES).id;
-    state.lettering = pick(LETTERINGS).id;
-    const [t, s, g] = pick(SURPRISE_TITLES);
-    state.title = t;
-    state.subtitle = s;
-    state.tagline = g;
-    // Shuffle the cast across the panels, hero photo stays the hero.
-    const order = [0, 1, 2, 4, 5].sort(() => Math.random() - 0.5);
-    const hero = state.panels[3];
-    const rest = state.panels.filter((_, i) => i !== 3);
-    const shuffled = rest.map((p, i) => ({
-      ...p,
-      cast: order[i],
-      fx: CAST[order[i]].fx,
-      fy: CAST[order[i]].fy,
-      label: CAST[order[i]].label,
-    }));
-    state.panels = [shuffled[0], shuffled[1], shuffled[2], hero, shuffled[3], shuffled[4]];
-    Promise.all(state.panels.map((p) => loadImage(CAST[p.cast].file))).then((imgs) => {
-      imgs.forEach((img, i) => { photos[i] = img; });
-      buildPanelList();
-      syncControls();
-      commit('Surprise! A fresh cover.');
-      redraw();
-    });
+    const next = cloneState(getState());
+    next.layout = pick(LAYOUTS).id;
+    next.grade = pick(GRADES).id;
+    next.lettering = pick(LETTERINGS).id;
+    next.title = pick(TITLE_IDEAS);
+    next.subtitle = pick(SUBTITLE_IDEAS);
+    next.tagline = pick(TAGLINE_IDEAS);
+    next.quote = Math.floor(Math.random() * QUOTES.length);
+    // Shuffle which sample sits in each panel, keeping every role filled.
+    const shuffled = [...SAMPLES].sort(() => Math.random() - 0.5);
+    next.panels.forEach((p, i) => { p.photo = shuffled[i % shuffled.length].id; });
+    commit(next, `Surprise: ${next.title} in ${LAYOUTS.find((l) => l.id === next.layout).name}.`);
+  }
+
+  function resetAll() {
+    commit(defaultState(), 'Back to the default Sunset Heist cover.');
+  }
+
+  // ------------------------------------------------------------ poster section
+  const poster = el('section', { class: 'panel-card', id: 'poster-controls' });
+  poster.append(el('h2', {}, 'Poster'));
+  const layoutSel = el('select', { id: 'layout-select' });
+  LAYOUTS.forEach((l) => layoutSel.append(option(l.id, l.name)));
+  layoutSel.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.layout = layoutSel.value;
+    commit(next, `Layout: ${LAYOUTS.find((l) => l.id === next.layout).name}.`);
   });
-  document.getElementById('one-photo').addEventListener('click', async () => {
-    const cast = state.panels[selectedPanel].cast;
-    const img = await loadImage(CAST[cast].file);
-    state.panels.forEach((p, i) => {
-      p.cast = cast;
-      p.label = CAST[cast].label;
-      photos[i] = img;
-    });
-    buildPanelList();
-    commit('One photo fills every panel.');
-    redraw();
+  poster.append(field('Layout', layoutSel));
+
+  const gradeSel = el('select', { id: 'grade-select' });
+  GRADES.forEach((g) => gradeSel.append(option(g.id, g.name)));
+  gradeSel.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.grade = gradeSel.value;
+    commit(next, `Grade: ${GRADES.find((g) => g.id === next.grade).name}.`);
   });
-  document.getElementById('reset').addEventListener('click', () => {
-    applySnapshot(defaultState());
-    commit('Back to the default cover.');
-    say('Reset to the default cover.');
+  poster.append(field('Grade', gradeSel));
+
+  const letterSel = el('select', { id: 'lettering-select' });
+  LETTERINGS.forEach((l) => letterSel.append(option(l.id, l.name)));
+  letterSel.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.lettering = letterSel.value;
+    commit(next, `Lettering: ${LETTERINGS.find((l) => l.id === next.lettering).name}.`);
+  });
+  poster.append(field('Lettering', letterSel));
+  root.append(poster);
+
+  // ------------------------------------------------------------ words section
+  const words = el('section', { class: 'panel-card', id: 'words-controls' });
+  words.append(el('h2', {}, 'Words'));
+  const titleIn = el('input', { id: 'title-input', type: 'text', maxlength: '24' });
+  titleIn.addEventListener('input', () => {
+    const next = cloneState(getState());
+    next.title = titleIn.value.toUpperCase() || 'UNTITLED';
+    commit(next);
+  });
+  words.append(field('Title', titleIn));
+  const subIn = el('input', { id: 'subtitle-input', type: 'text', maxlength: '48' });
+  subIn.addEventListener('input', () => {
+    const next = cloneState(getState());
+    next.subtitle = subIn.value || 'One Last Summer in Leonida';
+    commit(next);
+  });
+  words.append(field('Subtitle', subIn));
+  const tagIn = el('input', { id: 'tagline-input', type: 'text', maxlength: '48' });
+  tagIn.addEventListener('input', () => {
+    const next = cloneState(getState());
+    next.tagline = tagIn.value.toUpperCase() || 'EVERYONE WANTS A CUT';
+    commit(next);
+  });
+  words.append(field('Tagline', tagIn));
+  const quoteSel = el('select', { id: 'quote-select' });
+  QUOTES.forEach((q, i) => quoteSel.append(option(String(i), `\u201C${q.text}\u201D — ${q.source}`)));
+  quoteSel.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.quote = Number(quoteSel.value);
+    commit(next, 'Press quote changed.');
+  });
+  words.append(field('Press quote', quoteSel));
+
+  const starToggle = el('input', { id: 'starburst-toggle', type: 'checkbox' });
+  starToggle.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.showStarburst = starToggle.checked;
+    commit(next, next.showStarburst ? 'Starburst stamp on.' : 'Starburst stamp off.');
+  });
+  words.append(field('Starburst stamp', starToggle));
+  const billToggle = el('input', { id: 'billing-toggle', type: 'checkbox' });
+  billToggle.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.showBilling = billToggle.checked;
+    commit(next, next.showBilling ? 'Billing block + barcode on.' : 'Billing block + barcode off.');
+  });
+  words.append(field('Billing block + barcode', billToggle));
+  root.append(words);
+
+  // ------------------------------------------------------------ panels section
+  const panels = el('section', { class: 'panel-card', id: 'panels-controls' });
+  panels.append(el('h2', { id: 'panel-editor-title' }, 'Face-safe crop — The Rider'));
+  const tabs = el('div', { class: 'panel-tabs', id: 'panel-tabs' });
+  ROLES.forEach((role, i) => {
+    const b = el('button', { type: 'button', class: 'panel-tab', 'data-panel': String(i) }, String(i + 1));
+    b.title = role;
+    b.addEventListener('click', () => {
+      const next = cloneState(getState());
+      next.selectedPanel = i;
+      setState(next);
+      syncPanelEditor();
+      status(`Editing panel ${i + 1}: ${role}.`);
+    });
+    tabs.append(b);
+  });
+  panels.append(tabs);
+
+  const photoSel = el('select', { id: 'panel-photo-select' });
+  SAMPLES.forEach((s) => photoSel.append(option(s.id, s.label)));
+  const uploadBtn = el('button', { type: 'button', id: 'panel-upload-btn', class: 'ghost' }, 'Upload your photo…');
+  const uploadIn = el('input', { id: 'panel-upload-input', type: 'file', accept: 'image/*' });
+  uploadIn.style.display = 'none';
+  uploadBtn.addEventListener('click', () => uploadIn.click());
+  uploadIn.addEventListener('change', () => {
+    const file = uploadIn.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const key = `upload-${Date.now()}`;
+        images.set(key, img);
+        const next = cloneState(getState());
+        next.panels[next.selectedPanel].photo = key;
+        commit(next, `Your photo is in panel ${next.selectedPanel + 1}.`);
+        syncPanelEditor();
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+  photoSel.addEventListener('change', () => {
+    const next = cloneState(getState());
+    next.panels[next.selectedPanel].photo = photoSel.value;
+    commit(next, `Panel ${next.selectedPanel + 1} photo changed.`);
+  });
+  panels.append(field('Photo', photoSel), uploadBtn, uploadIn);
+
+  const zoomIn = el('input', { id: 'panel-zoom', type: 'range', min: '1', max: '2.2', step: '0.01' });
+  zoomIn.addEventListener('input', () => {
+    const next = cloneState(getState());
+    next.panels[next.selectedPanel].zoom = Number(zoomIn.value);
+    commit(next);
+  });
+  panels.append(field('Zoom', zoomIn));
+  const fxIn = el('input', { id: 'panel-fx', type: 'range', min: '0', max: '1', step: '0.01' });
+  fxIn.addEventListener('input', () => {
+    const next = cloneState(getState());
+    next.panels[next.selectedPanel].fx = Number(fxIn.value);
+    commit(next);
+  });
+  panels.append(field('Crop left ↔ right', fxIn));
+  const fyIn = el('input', { id: 'panel-fy', type: 'range', min: '0', max: '1', step: '0.01' });
+  fyIn.addEventListener('input', () => {
+    const next = cloneState(getState());
+    next.panels[next.selectedPanel].fy = Number(fyIn.value);
+    commit(next);
+  });
+  panels.append(field('Crop up ↔ down', fyIn));
+
+  const safeToggle = el('input', { id: 'face-safe-toggle', type: 'checkbox' });
+  safeToggle.addEventListener('change', () => {
+    const next = cloneState(getState());
+    const p = next.panels[next.selectedPanel];
+    p.faceSafe = safeToggle.checked;
+    if (p.faceSafe) {
+      p.fy = Math.min(Math.max(p.fy, 0.15), 0.5);
+      p.zoom = Math.min(p.zoom, 1.4);
+    }
+    commit(next, p.faceSafe ? 'Face-safe crop on for this panel.' : 'Face-safe crop off — free crop.');
+    syncPanelEditor();
+  });
+  panels.append(field('Face-safe crop', safeToggle));
+
+  const fillAll = el('button', { type: 'button', id: 'fill-all-btn', class: 'ghost' }, 'Use this photo in all six panels');
+  fillAll.addEventListener('click', () => {
+    const next = cloneState(getState());
+    const photo = next.panels[next.selectedPanel].photo;
+    next.panels.forEach((p) => { p.photo = photo; });
+    commit(next, 'One photo now fills all six panels.');
+  });
+  panels.append(fillAll);
+  root.append(panels);
+
+  function syncPanelEditor() {
+    const st = getState();
+    const p = st.panels[st.selectedPanel];
+    document.getElementById('panel-editor-title').textContent = `Face-safe crop — ${ROLES[p.role]}`;
+    tabs.querySelectorAll('.panel-tab').forEach((b, i) => b.classList.toggle('active', i === st.selectedPanel));
+    // An uploaded photo is not in the sample list; keep the select on the sample it replaces.
+    if ([...photoSel.options].some((o) => o.value === p.photo)) photoSel.value = p.photo;
+    zoomIn.value = String(p.zoom);
+    fxIn.value = String(p.fx);
+    fyIn.value = String(p.fy);
+    safeToggle.checked = p.faceSafe;
+    layoutSel.value = st.layout;
+    gradeSel.value = st.grade;
+    letterSel.value = st.lettering;
+    titleIn.value = st.title;
+    subIn.value = st.subtitle;
+    tagIn.value = st.tagline;
+    quoteSel.value = String(st.quote);
+    starToggle.checked = st.showStarburst;
+    billToggle.checked = st.showBilling;
+  }
+
+  function refreshButtons() {
+    document.getElementById('undo-btn').disabled = history.length === 0;
+    document.getElementById('redo-btn').disabled = future.length === 0;
+    syncPanelEditor();
+  }
+
+  document.getElementById('undo-btn').addEventListener('click', undo);
+  document.getElementById('redo-btn').addEventListener('click', redo);
+  document.getElementById('surprise-btn').addEventListener('click', surprise);
+  document.getElementById('reset-btn').addEventListener('click', resetAll);
+
+  // ------------------------------------------------------------ exports
+  document.querySelectorAll('[data-export]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const w = Number(btn.dataset.w);
+      const h = Number(btn.dataset.h);
+      const canvas = exportCover(getState(), images, w, h);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `sunset-heist-${w}x${h}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        status(`Exported ${w} × ${h} PNG — check your downloads.`);
+      }, 'image/png');
+    });
   });
 
-  const exportHost = document.getElementById('exports');
-  SIZES.forEach(({ label, w, h }) => {
-    const b = el('button', 'export-btn', `PNG ${label}`);
-    b.type = 'button';
-    b.addEventListener('click', async () => {
-      say(`Exporting ${label}…`);
-      const blob = await exportCover(state, photos, w, h);
-      downloadBlob(blob, `cover-${w}x${h}.png`);
-      say(`Saved cover-${w}x${h}.png`);
-    });
-    exportHost.appendChild(b);
-  });
-
-  // ---- first paint ----
-  syncControls();
-  buildPanelList();
-  syncUndoButtons();
-  Promise.all(CAST.map((m) => loadImage(m.file))).then((imgs) => {
-    state.panels.forEach((p, i) => { photos[i] = imgs[p.cast]; });
-    redraw();
-    window.__shotReady = true;
-  });
-  redraw();
-  return { state, photos, redraw, undo, redo };
+  syncPanelEditor();
+  refreshButtons();
+  return { undo, redo, surprise, resetAll, syncPanelEditor };
 }
